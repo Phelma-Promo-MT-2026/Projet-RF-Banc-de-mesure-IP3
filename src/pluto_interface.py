@@ -13,7 +13,7 @@ Date        : 17/10/2025
 import adi
 import numpy as np
 import matplotlib.pyplot as plt
-from error_manager import  error_manager
+from src.error_manager import  error_manager
 
 ###################################################################
 ###         Manage communication TX/RX with ADALM-PLUTO         ###
@@ -22,16 +22,24 @@ interface_error = error_manager ()
 
 
 class pluto_interface:   
-
-    def __init__(self):   
-        self.sdr = adi.Pluto("ip:192.168.2.1")
-        self.sdr = adi.Pluto()
-        #print(self.sdr._device_name)
-        pass
+    def __init__(self):  
+        try:
+            self.sdr = adi.Pluto("ip:192.168.2.1")
+            self.pluto_connected = True
+        except Exception as e:
+            print("Pluto SDR connection error",e)
+            self.sdr = None
+            self.pluto_connected = False
+        
+        if self.pluto_connected:
+            print(self.sdr._device_name)
+        else:
+            print("Pluto SDR not connected")
+        
     #-------------------------------------------------------------
     #                  Send Signal to PLUTO by IIO
     #-------------------------------------------------------------
-    def send_waveform(self, f_rf, g, delta_f, fs, n_sample, pe):
+    def generate_waveform(self, f_rf, g, delta_f, fs, n_sample, pe):
         #-------------------------------------#
         #--- Parameter and error management --#
         #-------------------------------------#
@@ -44,69 +52,62 @@ class pluto_interface:
         interface_error.check_range(pe      ,0,1,"Tx power")
         """
         #-------------------------------------#
+        #--       Signal Configuration      --#
+        #-------------------------------------#
+        t = np.arange(n_sample)/fs
+        signal = g * np.cos(2*np.pi*(delta_f/2)*t)
+        signal *=2**14                              # PLUTO SDR need sample between [-2^14;+2^14], not [-1;+1]
+        return signal
+
+    def send_waveform(self, f_rf, g, delta_f, fs, n_sample, pe):
+        signal = self.generate_waveform(f_rf, g, delta_f, fs, n_sample, pe)
+        #-------------------------------------#
         #--          SDR configuration      --#
         #-------------------------------------#
+        if(self.pluto_connected == False):
+            print("Pluto SDR not connected")
+            return
         self.sdr.sample_rate            = int(fs)    # Sample rate
         self.sdr.tx_rf_bandwidth        = int(fs)    # Filter cut frequency
         self.sdr.tx_lo                  = int(f_rf)  # Local oscillator frequency
         self.sdr.tx_hardwaregain_chan0  = pe    # Power tx : valid between -90dB and 0dB
-        #-------------------------------------#
-        #--       Signal Configuration      --#
-        #-------------------------------------#
-        t = np.linspace(0,1/fs,n_sample)
-        signal = g*np.exp(2j*np.pi*(delta_f)*t)
-        signal *=2**14                              # PLUTO SDR need sample between [-2^14;+2^14], not [-1;+1]
-        
-        ########################################
         self.sdr.tx_cyclic_buffer       = True       # Send sample unlimited time
+        self.sdr.tx_destroy_buffer()
         self.sdr.tx(signal)
         
-
         
     #------------------------------------------------------------   -
     #               Recveid Signal from PLUTO by IIO
     #-------------------------------------------------------------
     def receive_waveform(self, f_rf, g, delta_f, fs, n_sample):
         #-------------------------------------#
-        #--- Parameter and error management --#
-        #-------------------------------------#
-        
-        #-------------------------------------#
         #--          SDR configuration      --#
         #-------------------------------------#
+        if(self.pluto_connected == False):
+            print("Pluto SDR not connected")
+            return
         self.sdr.rx_lo                      = int(f_rf)
         self.sdr.rx_rf_bandwidth            = int(fs)
         self.sdr.rx_buffer_size             = n_sample
         self.sdr.gain_control_mode_chan0    = 'manual'
         self.sdr.rx_hardwaregain_chan0      = 0.0 # dB, augmenter pour augmenter le gain de réception, mais attention à ne pas saturer le CAN
         
+        #clean RX buffer
         for i in range (0, 10):
             raw_data = self.sdr.rx()
 
-        # Recevoir des échantillons
+        # Receive sample
         rx_samples = self.sdr.rx()
         print(rx_samples)
-
-        # Arrêter la transmission
+        return rx_samples
+           
+    
+    def send_and_receive(self, f_rf, g, delta_f, fs, n_sample, pe):
+        if(self.pluto_connected == False):
+            print("Pluto SDR not connected")
+            return
         self.sdr.tx_destroy_buffer()
-
-        # Calculer la densité spectrale de puissance (version du signal dans le domaine de la fréquence)
-        psd = np.abs(np.fft.fftshift(np.fft.fft(rx_samples)))**2
-        psd_dB = 10*np.log10(psd)
-        f = np.linspace(fs/-2, fs/2, len(psd))
-
-        # Tracer le domaine temporel
-        plt.figure(0)
-        plt.plot(np.real(rx_samples[::100]))
-        plt.plot(np.imag(rx_samples[::100]))
-        plt.xlabel("temps")
-
-        # Tracer le domaine freq
-        plt.figure(1)
-        plt.plot(f/1e6, psd_dB)
-        plt.xlabel("Frequences [MHz]")
-        plt.ylabel("DSP")
-        plt.show()
-        pass
-    
-    
+        self.send_waveform(f_rf, g, delta_f, fs, n_sample, pe)     
+        rx_signal = self.receive_waveform(f_rf, g, delta_f, fs, n_sample)
+        self.sdr.tx_destroy_buffer()
+        return rx_signal

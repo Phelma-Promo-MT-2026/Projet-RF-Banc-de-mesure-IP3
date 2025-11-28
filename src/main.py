@@ -13,14 +13,7 @@ def main():
         app = main_window()
         app.mainloop()
         
-    ###################################################################
-    ###                       DATA TREATMENT                        ###
-    ###################################################################
-    #spectrum = compute_fft(data)
-    #ip3_value = compute_ip3(spectrum)
-
-    #plot_spectrum(spectrum, ip3_value)
-
+        
 
   
 if __name__ == "__main__":
