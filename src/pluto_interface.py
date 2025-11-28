@@ -71,8 +71,8 @@ class pluto_interface:
         self.sdr.tx_rf_bandwidth        = int(fs)    # Filter cut frequency
         self.sdr.tx_lo                  = int(f_rf)  # Local oscillator frequency
         self.sdr.tx_hardwaregain_chan0  = pe    # Power tx : valid between -90dB and 0dB
-        self.sdr.tx_cyclic_buffer       = True       # Send sample unlimited time
         self.sdr.tx_destroy_buffer()
+        self.sdr.tx_cyclic_buffer       = True       # Send sample unlimited time
         self.sdr.tx(signal)
         
         

@@ -18,7 +18,7 @@ class test_tx_rx():
         #----------------------------------------------#
         print("send waveform to pluto")
         self.pluto.send_waveform(f_rf, g, delta_f, fs, n_sample, pe)
-        #self.pluto.sdr.send_waveform(2.35e9,1,10e6,1e6,4096,-10)
+        #self.pluto.send_waveform(2.4e9,1,1e6,1e6,10000,-10)
         
     def receive_signal_from_pluto(self,f_rf, g, delta_f, fs, n_sample):
         #----------------------------------------------#

@@ -27,12 +27,12 @@ class main_window(tk.Tk):
 
         ttk.Label(frame_left, text="Delta f (Hz):").pack(anchor="w")
         self.entry_delta_f = ttk.Entry(frame_left)
-        self.entry_delta_f.insert(0, "100e3")
+        self.entry_delta_f.insert(0, "10e6")
         self.entry_delta_f.pack(fill="x")
 
         ttk.Label(frame_left, text="Frequency RF (Hz):").pack(anchor="w")
         self.entry_rf = ttk.Entry(frame_left)
-        self.entry_rf.insert(0, "915e6")
+        self.entry_rf.insert(0, "2.4e9")
         self.entry_rf.pack(fill="x")
 
         ttk.Label(frame_left, text="Sample Frequency (Hz):").pack(anchor="w")
