@@ -1,13 +1,17 @@
-from tests.test_pluto_tx_rx import *
-from tests.test_end_to_end import *
-
-
+from tests.test_pluto_tx    import *
+from tests.test_end_to_end  import *
+from tests.test_pluto_rx    import *
+from tests.test_end_to_end  import *
+from tests.test_utils       import *
 class main_window(tk.Tk):
     def __init__(self):
         super().__init__()
         
         # === Parameter declaration ===
+        self.tx = test_tx()
+        self.rx = test_rx()
         self.tx_rx = test_tx_rx()
+        self.tools_box = test_tools_box()
         # === Main windows ===
         self.title("PlutoSDR Signal Generator GUI")
         self.geometry("1000x600")
@@ -54,6 +58,7 @@ class main_window(tk.Tk):
         ttk.Button(frame_left, text="Generate signal on tx" , command=self.send).pack(pady=20)
         ttk.Button(frame_left, text="Receive signal on rx"  , command=self.send_receive).pack(pady=20)
         ttk.Button(frame_left, text="General tx / Receiv rx", command=self.send_receive).pack(pady=20)  
+        ttk.Button(frame_left, text="Generate fft"          , command=self.generate_fft).pack(pady=20)  
         # === Spectrum ===
         self.fig, self.ax = plt.subplots(figsize=(6, 4))
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame_right)
@@ -70,7 +75,7 @@ class main_window(tk.Tk):
         except ValueError:
             print("Erreur : une des valeurs saisies est invalide.")
             return
-        self.tx_rx.send_signal_to_pluto(f_rf, g, delta_f, fs, n_sample, pe)
+        self.tx.send_signal_to_pluto(f_rf, g, delta_f, fs, n_sample, pe)
     
     def receive(self): 
         try:
@@ -86,7 +91,7 @@ class main_window(tk.Tk):
         rx_signal = self.tx_rx.receive_signal_from_pluto(f_rf, g, delta_f, fs, n_sample, pe)
         if(rx_signal is None):
             return None
-        self.tx_rx.display_fft(rx_signal, fs, n_sample,f_rf,delta_f)
+        self.rx.display_fft(rx_signal, fs, n_sample,f_rf,delta_f)
                 
     def send_receive(self): 
         try:
@@ -103,7 +108,17 @@ class main_window(tk.Tk):
         if(rx_signal is None):
             return None
         self.tx_rx.display_fft(rx_signal, fs, n_sample,f_rf,delta_f)
-    
+        
+    def generate_fft(self): 
+        try:
+            g        = int(float(self.entry_gain.get()))
+            delta_f  = int(float(self.entry_delta_f.get()))
+            fs       = int(float(self.entry_fs.get()))
+            n_sample = int(float(self.entry_N.get()))  
+        except ValueError:
+            print("Erreur : une des valeurs saisies est invalide.")
+            return
+        self.tools_box.test_fft_calculation_base_band(g, delta_f, fs, n_sample)        
 def main():
         app = main_window()
         app.mainloop()

@@ -14,7 +14,7 @@ import adi
 import numpy as np
 import matplotlib.pyplot as plt
 from src.error_manager import  error_manager
-
+from src.utils         import  *
 ###################################################################
 ###         Manage communication TX/RX with ADALM-PLUTO         ###
 ###################################################################
@@ -35,32 +35,14 @@ class pluto_interface:
             print(self.sdr._device_name)
         else:
             print("Pluto SDR not connected")
-        
+        self.tool = tools_box()
     #-------------------------------------------------------------
     #                  Send Signal to PLUTO by IIO
     #-------------------------------------------------------------
-    def generate_waveform(self, f_rf, g, delta_f, fs, n_sample, pe):
-        #-------------------------------------#
-        #--- Parameter and error management --#
-        #-------------------------------------#
-        """
-        interface_error.check_range(g       ,0,1,"gain")
-        interface_error.check_range(f_rf    ,0,1,"RF frequency")
-        interface_error.check_range(delta_f ,0,1,"Δf for 2 ton around f_rf")
-        interface_error.check_range(fs      ,0,1,"Sample rate")
-        interface_error.check_range(n_sample,0,1,"Sample number") 
-        interface_error.check_range(pe      ,0,1,"Tx power")
-        """
-        #-------------------------------------#
-        #--       Signal Configuration      --#
-        #-------------------------------------#
-        t = np.arange(n_sample)/fs
-        signal = g * np.cos(2*np.pi*(delta_f/2)*t)
-        signal *=2**14                              # PLUTO SDR need sample between [-2^14;+2^14], not [-1;+1]
-        return signal
+    
 
     def send_waveform(self, f_rf, g, delta_f, fs, n_sample, pe):
-        signal = self.generate_waveform(f_rf, g, delta_f, fs, n_sample, pe)
+        signal = self.tool.generate_waveform_base_band(g, delta_f, fs, n_sample)
         #-------------------------------------#
         #--          SDR configuration      --#
         #-------------------------------------#
