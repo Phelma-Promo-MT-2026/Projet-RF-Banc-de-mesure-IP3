@@ -6,12 +6,12 @@ from tests.test_utils       import *
 class main_window(tk.Tk):
     def __init__(self):
         super().__init__()
-        
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
         # === Parameter declaration ===
         self.tx = test_tx()
         self.rx = test_rx()
         self.tx_rx = test_tx_rx()
-        self.tools_box = test_tools_box()
+        self.utils = utils()
         # === Main windows ===
         self.title("PlutoSDR Signal Generator GUI")
         self.geometry("1000x600")
@@ -64,6 +64,11 @@ class main_window(tk.Tk):
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame_right)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
     
+    def on_close(self):
+        plt.close('all')      # ferme proprement les figures Matplotlib
+        self.destroy()        # détruit la fenêtre Tkinter
+        self.quit()           # sort de la boucle mainloop
+        
     def send(self): 
         try:
             f_rf     = int(float(self.entry_rf.get()))
@@ -118,7 +123,7 @@ class main_window(tk.Tk):
         except ValueError:
             print("Erreur : une des valeurs saisies est invalide.")
             return
-        self.tools_box.test_fft_calculation_base_band(g, delta_f, fs, n_sample)        
+        self.utils.test_fft_calculation_base_band(g, delta_f, fs, n_sample)        
 def main():
         app = main_window()
         app.mainloop()

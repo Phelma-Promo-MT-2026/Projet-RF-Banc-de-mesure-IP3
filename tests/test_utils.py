@@ -1,9 +1,9 @@
 from src.utils import *  # adapter au vrai nom de ta classe
 
 
-class test_tools_box:
+class test_utils:
     def __init__(self):
-        self.tools = tools_box()
+        self.tools = utils()
 
     def test_fft_calculation_base_band(self, g, delta_f, fs, n_sample):
         # ----------------------------------------------#

@@ -5,7 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import ttk
 
 
-class tools_box:
+class utils:
     def __init__(self):
         pass
 
