@@ -35,7 +35,7 @@ class pluto_interface:
             print(self.sdr._device_name)
         else:
             print("Pluto SDR not connected")
-        self.tool = tools_box()
+        self.tool = utils()
     #-------------------------------------------------------------
     #                  Send Signal to PLUTO by IIO
     #-------------------------------------------------------------
