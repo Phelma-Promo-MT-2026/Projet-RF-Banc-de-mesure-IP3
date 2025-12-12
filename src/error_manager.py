@@ -1,47 +1,35 @@
+# src/error_manager.py
+
 class error_manager:
     """
-    Error manager class
+    Centralized error/message manager.
+    This class only formats messages; the GUI decides how to display them.
     """
 
-    def __init__(self, verbose=True):
-        self.verbose = verbose
-        self.errors = []  # logs
+    def __init__(self):
+        # You can add global state or configuration here if needed
+        pass
 
-    def log_error(self, message):
-        """Add error to log and display."""
-        self.errors.append(message)
-        if self.verbose:
-            print(f"[Error] {message}")
+    def pluto_connection_error(self, exception: Exception) -> str:
+        return f"[ERROR] Pluto SDR connection error: {exception}"
 
-    def check_type(self, var, expected_type, var_name="variable"):
-        if not isinstance(var, expected_type):
-            self.log_error(f"{var_name} must be type {expected_type.__name__}, receveid {type(var).__name__}")
-            return False
-        return True
+    def pluto_not_connected(self) -> str:
+        return "[ERROR] Pluto SDR not connected"
 
-    def check_range(self, value, min_val=None, max_val=None, var_name="value"):
-        if not isinstance(value, (int, float)):
-            self.log_error(f"{var_name} must be numeric (int ou float).")
-            return False
-        if min_val is not None and value < min_val:
-            self.log_error(f"{var_name} too low ({value} < {min_val})")
-            return False
-        if max_val is not None and value > max_val:
-            self.log_error(f"{var_name} too high ({value} > {max_val})")
-            return False
-        return True
+    def tx_no_channel_selected(self) -> str:
+        return "[ERROR] No channel selected for TX"
 
-    def check_choice(self, value, valid_choices, var_name="value"):
-        if value not in valid_choices:
-            self.log_error(f"{var_name} must be among {valid_choices}, received {value}")
-            return False
-        return True
+    def rx_invalid_params(self) -> str:
+        return "[ERROR] Invalid RX parameters"
 
-    def reset_errors(self):
-        self.errors = []
+    def invalid_rf_or_power(self) -> str:
+        return "[ERROR] Invalid RF frequency or power value"
 
-    def has_errors(self):
-        return len(self.errors) > 0
+    def invalid_rf(self) -> str:
+        return "[ERROR] Invalid RF frequency value"
 
-    def get_errors(self):
-        return self.errors
+    def tx_pluto_not_connected(self) -> str:
+        return "[ERROR] Impossible to send waveform on tx: Pluto not connected"
+
+    def waveform_no_channel(self) -> str:
+        return "[ERROR] No channel selected for waveform generation"
