@@ -121,7 +121,7 @@ class pluto_interface:
     #------------------------------------------------------------   -
     #               Recveid Signal from PLUTO by IIO
     #-------------------------------------------------------------
-    def receive_waveform(self, f_rf, delta_f, fs_pluto, n_sample):
+    def receive_waveform(self, f_rf, delta_f, fs_pluto, n_sample,g_rx):
         #-------------------------------------#
         #--          SDR configuration      --#
         #-------------------------------------#
@@ -132,7 +132,7 @@ class pluto_interface:
         self.sdr.rx_rf_bandwidth            = int(fs_pluto)
         self.sdr.rx_buffer_size             = n_sample
         self.sdr.gain_control_mode_chan0    = 'manual'
-        self.sdr.rx_hardwaregain_chan0      = 0.0 # dB
+        self.sdr.rx_hardwaregain_chan0      = g_rx # dB
         
         #clean RX buffer
         for i in range (0, 10):
@@ -141,21 +141,33 @@ class pluto_interface:
         # Receive sample
         rx_samples = self.sdr.rx()
         
-        # Calculer la densité spectrale de puissance (version du signal dans le domaine de la fréquence)
-        psd = np.abs(np.fft.fftshift(np.fft.fft(rx_samples)))**2
-        psd_dB = 10*np.log10(psd)
-        f = np.linspace(fs_pluto/-2, fs_pluto/2, len(psd))
+        return  rx_samples
 
-        # Tracer le domaine temporel
-        plt.figure(0)
-        plt.plot(np.real(rx_samples[::100]))
-        plt.plot(np.imag(rx_samples[::100]))
-        plt.xlabel("temps")
+    
+    def spectrum_to_dBm(self, rx_samples, fs, f_rf):
+        """
+        Spectre en dBm par bin avec FFT centrée.
+        Axe fréquence : absolu autour de f_rf.
+        rx_samples : échantillons complexes issus de l'ADC (int16 ou float).
+        """
+        N = len(rx_samples)
 
-        # Tracer le domaine freq
-        plt.figure(1)
-        plt.plot(f/1e6, psd_dB)
-        plt.xlabel("Frequences [MHz]")
-        plt.ylabel("DSP")
-        plt.show()
-           
+        # FFT centrée et normalisée (sur les codes ADC bruts)
+        X = np.fft.fftshift(np.fft.fft(rx_samples)) / N
+
+        A_sample = np.abs(X)
+        # Puissance par bin en unités ADC^2
+        P_bin = np.abs(X) ** 2       # réel
+
+        # éviter log(0)
+        P_bin_safe = P_bin.copy()
+        P_bin_safe[P_bin_safe <= 0] = 1e-20
+
+        P_dBm = 10 * np.log10(P_bin_safe)
+
+        # Axe fréquence centré
+        freq_base = np.fft.fftshift(np.fft.fftfreq(N, d=1.0 / fs))   # [-fs/2; +fs/2]
+        freq_abs  = freq_base + f_rf
+
+        # On renvoie freq_abs (ou freq_base), P_bin réel et P_dBm
+        return freq_abs, P_bin, P_dBm, A_sample

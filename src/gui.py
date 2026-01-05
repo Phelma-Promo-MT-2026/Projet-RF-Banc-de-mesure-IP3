@@ -64,6 +64,12 @@ class parameter(tk.Toplevel):
         self.entry_pe = ttk.Entry(main_frame)
         self.entry_pe.grid(row=4, column=1, sticky="ew", pady=5)
         self.entry_pe.insert(0, f"{float(self.parent.pe):}")
+        
+        # --- g_rx ---
+        ttk.Label(main_frame, text="Gain Rx (dBm) :").grid(row=4, column=0, sticky="w", pady=5)
+        self.entry_g_rx = ttk.Entry(main_frame)
+        self.entry_g_rx.grid(row=4, column=1, sticky="ew", pady=5)
+        self.entry_g_rx.insert(0, f"{float(self.parent.pe):}")
 
         # --- boutons ---
         btn_frame = ttk.Frame(main_frame)
@@ -163,7 +169,8 @@ class main_window(tk.Tk):
         self.n_sample = int(defaults.get("n_sample", 1024))
         self.f_rf = defaults.get("f_rf", 2.4e9)
         self.pe = defaults.get("pe", -20)
-
+        self.g_rx = defaults.get("g_rx",0)
+        self.k = 0
         self.test_pluto = pluto_interface()
         self.test_utils = utils()
 
@@ -202,6 +209,11 @@ class main_window(tk.Tk):
         self.entry_rf = ttk.Entry(frame_left)
         self.entry_rf.insert(0, f"{self.f_rf:.1e}")
         self.entry_rf.pack(fill="x")
+        
+        ttk.Label(frame_left, text="Gain Rx (dB):").pack(anchor="w")
+        self.entry_g_rx = ttk.Entry(frame_left)
+        self.entry_g_rx.insert(0, f"{self.g_rx}")
+        self.entry_g_rx.pack(fill="x")
 
         # === Channel selection ===
         channels_frame = ttk.LabelFrame(frame_left, text="Channels")
@@ -332,22 +344,72 @@ class main_window(tk.Tk):
         f, spectrum = self.test_utils.compute_fft(signal_modulated, self.f_rf)
         spectrum_db = self.test_utils.spectrum_to_dbm(spectrum)
         self.display_spectrum_tx(signal_modulated, f_rf)
-
+        
+        
     def receive(self):
         f_rf = float(self.entry_rf.get())
-        self.f_rf = f_rf
-        self.test_pluto.receive_waveform(self.f_rf, self.delta_f, self.fs_pluto, self.n_sample)
+        g_rx = float(self.entry_g_rx.get())
+
+        rx_sample           = self.test_pluto.receive_waveform(int(f_rf), self.delta_f, self.fs_pluto, self.n_sample,0)
+        freq, P_dBm,P_mW    = self.test_pluto.spectrum_to_dBm(rx_sample, self.fs_pluto, self.k)
+        self.display_spectrum_rx(freq/1e6,P_mW,  "Received on rx", "Frequency [MHz]", "Amplitude [dBm]")
 
     def send_receive(self):
         f_rf = float(self.entry_rf.get())
         pe = float(self.entry_power.get())
         self.f_rf = f_rf
         self.pe = pe
-        self.test_pluto.send_waveform(
-            int(f_rf), self.delta_f, self.fs_pluto, self.n_sample, int(pe)
-        )
-        self.test_pluto.receive_waveform(int(f_rf), self.delta_f, self.fs_pluto, self.n_sample)
+        I_enable = self.I_var.get()
+        Q_enable = self.Q_var.get()
 
+        return_code = self.test_pluto.send_waveform(
+            int(f_rf),
+            self.delta_f,
+            self.fs_pluto,
+            self.n_sample,
+            int(pe),
+            I_enable,
+            Q_enable,
+        )
+        #signal_v, signal_code = self.test_utils.generate_waveform_base_band(int(pe), self.delta_f, self.n_sample, I_enable,Q_enable)
+        #signal_modulated = self.test_utils.modulate_waveform(signal_v, int(f_rf), self.n_sample,self.delta_f)
+        #self.display_spectrum_tx(signal_modulated, f_rf)
+        if return_code == 1:
+            self.log.write(
+                f"[OK] Send TX: f_rf={f_rf:.3e} Hz, P={pe:.1f} dBm, I={I_enable}, Q={Q_enable}"
+            )
+        elif return_code == 0:
+            self.log.write("Impossible to send Waveform on tx : Pluto not connected")
+            self.ax_tx.clear()
+            return
+        elif return_code == 2:
+            self.log.write("Impossible to send Waveform on tx : No channel (I or Q) selected")
+            self.ax_tx.clear()
+            return
+
+        # --- Réception ---
+        rx_sample = self.test_pluto.receive_waveform(
+            int(f_rf),
+            self.delta_f,
+            self.fs_pluto,
+            self.n_sample,
+            0,
+        )
+
+        # Spectre à partir des codes ADC complexes
+        freq_abs, P_bin, P_dBm,A_sample = self.test_pluto.spectrum_to_dBm(
+            rx_sample, self.fs_pluto, int(f_rf)
+        )
+
+        # Affichage linéaire (P_bin) autour de f_rf
+        self.display_spectrum_rx(
+            (freq_abs - f_rf) / 1e6,   # offset en MHz
+            A_sample,
+            "Received on rx",
+            "Frequency offset [MHz]",
+            "P_bin [ADC^2]"
+        )
+        
     def generate_fft(self):
         f_rf = float(self.entry_rf.get())
         pe = float(self.entry_power.get())
@@ -366,16 +428,29 @@ class main_window(tk.Tk):
         self.log.write(f"[OK] Generated FFT: f_rf={f_rf:.3e} Hz, P={pe:.1f} dBm, I={I_enable}, Q={Q_enable}")
         self.display_spectrum_tx(signal_modulated, f_rf)
         
-    def diplay_spectrum_rx(self,signal_v, f_rf):
-        f, spectrum = self.test_utils.compute_fft(signal_v, int(f_rf))
-        spectrum_db = self.test_utils.spectrum_to_dbm(spectrum)
+    def display_spectrum_rx(self, x, y, title="Received on rx", x_axis="", y_axix=""):
         self.ax_rx.clear()
-        self.ax_rx.plot(f, spectrum_db)
-        self.ax_rx.set_title("Received on rx")
-        self.ax_rx.set_xlabel("Frequency (Hz)")
-        self.ax_rx.set_ylabel("Amplitude (dBm)")
+        self.ax_rx.plot(x, y)
+        self.ax_rx.set_title(title)
+        # par exemple +/- fs_pluto/2 en MHz
+        #span_MHz = (self.fs_pluto / 2) / 1e6
+        #self.ax_rx.set_xlim(-span_MHz, span_MHz)
+        self.ax_rx.set_xlabel(x_axis)
+        self.ax_rx.set_ylabel(y_axix)
         self.ax_rx.grid(True)
         self.canvas_rx.draw()
+        
+    def debug_plot_time(self,rx_samples):
+        plt.figure()
+        plt.plot(np.real(rx_samples), label="I")
+        plt.plot(np.imag(rx_samples), label="Q")
+        plt.axhline(2047, color="r", linestyle="--")
+        plt.axhline(-2048, color="r", linestyle="--")
+        plt.legend()
+        plt.title("ADC codes vs échantillons")
+        plt.grid(True)
+        plt.show()
+
     
     def display_spectrum_tx(self,signal_v, f_rf):
         f, spectrum = self.test_utils.compute_fft(signal_v, int(f_rf))
