@@ -199,3 +199,84 @@ class utils:
         plt.title(title)
         plt.grid(True)
         plt.show()
+    
+    def compute_delta_db(
+        self,
+        f,
+        spectrum_dbm,
+        f_fund=500e3,
+        f_im3=1.5e6,
+        search_bw=100e3
+    ):
+        """
+        Calcule Delta_dB pour un test deux-tons :
+        Delta_dB = moyenne de (P_fondamental - P_IM3) sur les deux côtés.
+
+        Paramètres
+        ----------
+        f : ndarray
+            Axe fréquentiel (Hz), cohérent avec spectrum_dbm.
+        spectrum_dbm : ndarray
+            Spectre en dBm (monolatéral).
+        f_fund : float
+            Fréquence absolue des fondamentaux (Hz), p.ex. 500 kHz.
+        f_im3 : float
+            Fréquence absolue des IM3 (Hz), p.ex. 1.5 MHz.
+        search_bw : float
+            Largeur de bande de recherche autour de chaque fréquence (Hz).
+
+        Retour
+        ------
+        delta_db : float
+            Delta_dB moyen entre fondamentaux et IM3 (en dB).
+        P1_avg_dbm : float
+            Puissance moyenne des deux fondamentaux (en dBm).
+        """
+
+        def local_max_in_band(f_center):
+            """Retourne l'amplitude max et la fréquence correspondante dans une bande autour de f_center."""
+            mask = (f >= (f_center - search_bw)) & (f <= (f_center + search_bw))
+            if not np.any(mask):
+                raise ValueError(f"Aucun point dans la bande autour de {f_center} Hz")
+            idx_band = np.where(mask)[0]
+            idx_local_max = idx_band[np.argmax(spectrum_dbm[idx_band])]
+            return spectrum_dbm[idx_local_max], f[idx_local_max]
+
+        # Fondamentaux (côté + et côté -)
+        P1_pos_dbm, f1_pos = local_max_in_band(+f_fund)
+        P1_neg_dbm, f1_neg = local_max_in_band(-f_fund)
+
+        # IM3 (côté + et côté -)
+        P3_pos_dbm, f3_pos = local_max_in_band(+f_im3)
+        P3_neg_dbm, f3_neg = local_max_in_band(-f_im3)
+
+        # Deltas individuels
+        delta_pos = P1_pos_dbm - P3_pos_dbm
+        delta_neg = P1_neg_dbm - P3_neg_dbm
+        print(f"Fundamental +: {P1_pos_dbm:.2f} dBm at {f1_pos/1e6:.3f} MHz")
+        print(f"Fundamental -: {P1_neg_dbm:.2f} dBm at {f1_neg/1e6:.3f} MHz")
+        print(f"IM3 -: {P3_neg_dbm:.2f} dBm at {f3_neg/1e6:.3f} MHz")
+        print(f"IM3 +: {P3_pos_dbm:.2f} dBm at {f3_pos/1e6:.3f} MHz")
+
+        # Moyennes
+        delta_db = 0.5 * (delta_pos + delta_neg)
+        P1_avg_dbm = 0.5 * (P1_pos_dbm + P1_neg_dbm)
+
+        return delta_db, P1_avg_dbm
+    
+    def compute_ip3(self, power_dbm,f,spectrum_dbm):
+        """
+        Compute the output power at the third-order intermodulation point (IP3).
+
+        Parameters:
+        - power_dbm (float): Input power in dBm.
+        - delta_db (float): Delta in dB.
+
+        Returns:
+        - ip3_dbm (float): Output IP3 power in dBm.
+        """
+        delta_db,peak_idx = self.compute_delta_db(f,spectrum_dbm)
+        print(f"Delta dB between fundamental and IM3: {delta_db} dB")
+        print(f"Peaks at indices: {peak_idx}")
+        ip3_dbm = power_dbm + (delta_db / 2.0)
+        return ip3_dbm

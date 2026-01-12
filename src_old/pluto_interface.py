@@ -155,9 +155,11 @@ class pluto_interface:
         # FFT centrée et normalisée (sur les codes ADC bruts)
         X = np.fft.fftshift(np.fft.fft(rx_samples)) / N
 
+        #X = np.fftshift(np.fft.fft(rx_samples)) / N
+        
         A_sample = np.abs(X)
         # Puissance par bin en unités ADC^2
-        P_bin = np.abs(X) ** 2       # réel
+        P_bin = (np.abs(X) ** 2)/50       # réel
 
         # éviter log(0)
         P_bin_safe = P_bin.copy()
@@ -167,6 +169,7 @@ class pluto_interface:
 
         # Axe fréquence centré
         freq_base = np.fft.fftshift(np.fft.fftfreq(N, d=1.0 / fs))   # [-fs/2; +fs/2]
+        #freq_base = np.fft.fftfreq(N, d=1.0 / fs)
         freq_abs  = freq_base + f_rf
 
         # On renvoie freq_abs (ou freq_base), P_bin réel et P_dBm
