@@ -1,7 +1,7 @@
 from src.gui import *    
 
 def main():
-        app = main_window()
+        app = MainWindow()
         app.mainloop()
   
 if __name__ == "__main__":

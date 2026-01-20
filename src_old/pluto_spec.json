@@ -1,9 +1,0 @@
-{
-    "f_min": 56000000.0,
-    "f_max": 3800000000.0,
-    "f_sample_min": 10000000.0,
-    "f_sample_max": 56000000.0,
-    "power_tx_min": -90.0,
-    "power_tx_max": 0.0,
-    "n_sample_default": 1024
-}

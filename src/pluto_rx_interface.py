@@ -1,5 +1,5 @@
 import adi
-from iip3_bench import RxParams
+from src.param import *
 
 class PlutoRxInterface:
     def __init__(self,ip_addr):
@@ -9,9 +9,6 @@ class PlutoRxInterface:
             self.connected =  True
         except:
             self.connected =  False
-        self.current_fs: float
-        self.current_lo: float
-        self.current_pe: float
         pass 
     
     def configure_rx(self, params: RxParams):

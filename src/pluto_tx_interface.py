@@ -1,5 +1,6 @@
 import adi
-from iip3_bench import TxParams
+from src.param import *
+
 class PlutoTxInterface:
     def __init__(self, ip_addr):
         self.ip = ip_addr  # IP du Pluto TX.
@@ -8,9 +9,6 @@ class PlutoTxInterface:
             self.connected =  True
         except:
             self.connected =  False
-        self.current_fs: float
-        self.current_lo: float
-        self.current_pe: float
         pass 
     
     def configure_tx(self, params: TxParams):
