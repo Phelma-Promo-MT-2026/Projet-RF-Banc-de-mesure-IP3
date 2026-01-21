@@ -108,7 +108,7 @@ class SignalUtils:
             # Find maximum amplitude and its frequency around a given center
             mask = (f >= (f_center - search_bw)) & (f <= (f_center + search_bw))
             if not np.any(mask):
-                raise ValueError(f"Aucun point dans la bande autour de {f_center} Hz")
+                raise ValueError(f"No points in band around {f_center} Hz")
             idx_band = np.where(mask)[0]
             idx_local_max = idx_band[np.argmax(spectrum_dbm[idx_band])]
             return spectrum_dbm[idx_local_max], f[idx_local_max]

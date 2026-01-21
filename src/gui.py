@@ -213,14 +213,14 @@ class MainWindow(tk.Tk):
         rx_connected = self.bench.rx_iface.is_connected()
 
         if tx_connected:
-            self.err_mgr.info("Pluto TX détecté et connecté.")
+            self.err_mgr.info("Pluto TX detected and connected.")
         else:
-            self.err_mgr.error("Pluto TX non détecté au démarrage.")
+            self.err_mgr.error("Pluto TX not connected at startup.")
 
         if rx_connected:
-            self.err_mgr.info("Pluto RX détecté et connecté.")
+            self.err_mgr.info("Pluto RX detected and connected.")
         else:
-            self.err_mgr.error("Pluto RX non détecté au démarrage.")
+            self.err_mgr.error("Pluto RX not detected at startup.")
 
     def _read_params(self):
         # Read user-entered parameters from GUI fields and build Tx/RxParams

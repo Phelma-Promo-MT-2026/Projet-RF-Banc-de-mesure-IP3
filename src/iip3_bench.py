@@ -45,7 +45,9 @@ class IIP3Bench:
         pe_corr = tx_params.pe_dbm + corr_db
         self.err_mgr.info(
             f"Calibration TX: f={f_ref/1e6:.1f} MHz, P_cmd={tx_params.pe_dbm:.1f} dBm, "
-            f"corr={corr_db:+.1f} dB → P_tx={pe_corr:.1f} dBm"
+        )
+        self.err_mgr.info(
+            f"correction={corr_db:+.1f} dBm → P_tx={pe_corr:.1f} dBm"
         )
 
         # Build a new TxParams instance with corrected power while preserving other fields
@@ -94,11 +96,9 @@ class IIP3Bench:
         # 1) Generate baseband two-tone signal and DAC codes
         # Convention: pe_dbm = power per tone, delta_f = spacing between the two tones
         # Generate signal using corrected TX power
-        self.err_mgr.info(
-            f"Generating two-tone baseband signal: f_rf={tx_corr.f_rf:.3e} Hz, "
-            f"pe_dbm={tx_corr.pe_dbm:.1f} dBm, delta_f={tx_corr.delta_f:.1e} Hz, "
-            f"n_sample={tx_corr.n_sample}"
-        )
+        self.err_mgr.info(f"Generating two-tone signal: f_rf={tx_corr.f_rf:.3e} Hz, ")
+        self.err_mgr.info(f"pe_dbm={tx_corr.pe_dbm:.1f} dBm, delta_f={tx_corr.delta_f:.1e} Hz, ")
+        self.err_mgr.info(f"n_sample={tx_corr.n_sample}")
         signal_v, signal_codes = self.signal_utils.generate_two_tone_baseband(
             pe_dbm=tx_corr.pe_dbm,
             delta_f=tx_corr.delta_f,

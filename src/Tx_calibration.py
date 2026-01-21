@@ -37,10 +37,10 @@ class TxCalibration:
         # Look up gain correction for given RF frequency and TX power
         # Check that requested frequency is inside calibration table bounds
         if not (self.freqs[0] <= f_rf_user <= self.freqs[-1]):
-            raise ValueError("f_rf en dehors de l’abaque")
+            raise ValueError("f_rf outside of abacus")
         # Check that requested power is inside calibration table bounds
         if not (self.powers[0] <= p_tx_user <= self.powers[-1]):
-            raise ValueError("P_tx en dehors de l’abaque")
+            raise ValueError("P_tx outside of abacus")
 
         # Find nearest grid indices for frequency and power
         i_f = self._nearest_index(self.freqs, f_rf_user)
@@ -51,9 +51,6 @@ class TxCalibration:
         meas_tx = self.grid[i_f][i_p]
         # Correction to apply so that commanded power matches target
         corr_db = p_tx_user - meas_tx
-        print("p_tx_user:", p_tx_user)
-        print("corr_db:", corr_db)
-
         # Reference points actually used from the grid
         f_ref = self.freqs[i_f]
         p_ref = self.powers[i_p]

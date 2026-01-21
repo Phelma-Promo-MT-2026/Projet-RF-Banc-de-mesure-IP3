@@ -1,7 +1,6 @@
 import adi
 from src.param import *
 
-
 class PlutoRxInterface:
     def __init__(self, ip_addr):
         # Initialize Pluto SDR RX interface using given IP address
