@@ -1,8 +1,8 @@
 
 from src.iip3_bench import *
-
-PLUTO_TX_IP = "ip:192.168.2.10"
-PLUTO_RX_IP = "ip:192.168.2.11"
+# Import IIP3-related types (e.g., TxParams, RxParams) used in configuration utilities
+PLUTO_TX_IP = "ip:192.168.2.10"  # Default IP address for the Pluto TX device
+PLUTO_RX_IP = "ip:192.168.2.11"  # Default IP address for the Pluto RX device
 
 def load_user_settings(path="settings.json"):
     return TxParams(), RxParams()
