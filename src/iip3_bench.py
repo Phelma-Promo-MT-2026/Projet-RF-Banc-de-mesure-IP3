@@ -6,42 +6,49 @@ from dataclasses import dataclass
 from src.error_manager import ErrorManager
 from src.Tx_calibration import TxCalibration
 
-class IIP3Bench :
-    def __init__(self, tx_iface, rx_iface, signal_utils,err_mgr: ErrorManager, calib: TxCalibration):
-        self.tx_iface =  tx_iface
-        self.rx_iface =  rx_iface
-        self.signal_utils =  signal_utils
+
+class IIP3Bench:
+    def __init__(self, tx_iface, rx_iface, signal_utils, err_mgr: ErrorManager, calib: TxCalibration):
+        # Core bench orchestrator: holds TX/RX interfaces, DSP utilities, logger and calibration
+        self.tx_iface = tx_iface
+        self.rx_iface = rx_iface
+        self.signal_utils = signal_utils
         self.err_mgr = err_mgr
         self.calib = calib
+        # Store last-used TX/RX parameters for subsequent operations
         self.current_tx_params: TxParams
         self.current_rx_params: RxParams
         pass
-    
+
     def set_calibration(self, calib: TxCalibration):
+        # Update the calibration table used for TX power correction
         self.calib = calib
 
     def _apply_tx_calibration(self, tx_params: TxParams) -> TxParams:
-        """Retourne une copie de tx_params avec puissance corrigée."""
+        """Return a copy of tx_params with TX power corrected using the calibration table."""
         if self.calib is None:
-            return tx_params  # pas de calibration
+            # No calibration available, return original parameters
+            return tx_params
 
         try:
+            # Lookup correction based on user RF frequency and commanded power
             corr_db, f_ref, p_ref = self.calib.get_correction(
                 f_rf_user=tx_params.f_rf,
                 p_tx_user=tx_params.pe_dbm,
             )
         except ValueError as e:
-            # hors abaque -> message d’erreur et on garde la valeur brute
+            # Out of calibration table range: log error and keep original power
             self.err_mgr.error(str(e))
             return tx_params
 
+        # Apply correction to commanded TX power
         pe_corr = tx_params.pe_dbm + corr_db
         self.err_mgr.info(
             f"Calibration TX: f={f_ref/1e6:.1f} MHz, P_cmd={tx_params.pe_dbm:.1f} dBm, "
             f"corr={corr_db:+.1f} dB → P_tx={pe_corr:.1f} dBm"
         )
 
-        # crée un nouveau TxParams avec la puissance corrigée
+        # Build a new TxParams instance with corrected power while preserving other fields
         return TxParams(
             f_rf=tx_params.f_rf,
             delta_f=tx_params.delta_f,
@@ -49,41 +56,44 @@ class IIP3Bench :
             pe_dbm=pe_corr,
             n_sample=tx_params.n_sample,
         )
-        
-    def configure(self, tx_params, rx_params) : #stocke les paramètres et configure les 2 Pluto.
-        # Mémorise les paramètres courants
+
+    def configure(self, tx_params, rx_params):
+        # Store current TX/RX parameters and configure both Pluto devices
         self.current_tx_params = tx_params
         self.current_rx_params = rx_params
 
-        # Configure TX si connecté
+        # Configure TX if the interface is connected
         if self.tx_iface.is_connected():
             self.tx_iface.configure_tx(tx_params)
 
-        # Configure RX si connecté
+        # Configure RX if the interface is connected
         if self.rx_iface.is_connected():
             self.rx_iface.configure_rx(rx_params)
         pass
 
-    def send_tx(self, tx_params=None) :
-        #get tx_params or use current
+    def send_tx(self, tx_params=None):
+        # Generate and send TX waveform, then compute theoretical spectrum for display
+        # Use previously stored parameters if none are explicitly provided
         if tx_params is None:
             tx_params = self.current_tx_params
         if tx_params is None:
             self.err_mgr.error("TX params not configured before send_tx()")
 
+        # Check that TX interface is available
         if not self.tx_iface.is_connected():
             self.err_mgr.error("Pluto TX not connected")
             return None, None
-        
-        # applique la calibration
+
+        # Apply TX calibration before waveform generation
         tx_corr = self._apply_tx_calibration(tx_params)
         if tx_corr.pe_dbm > 0:
+            # Positive correction is unexpected; abort to avoid overdriving TX
             self.err_mgr.warning("Calibration correction is positive, which may indicate an issue.")
             return None, None, None, None
-        
-        # 1) generate baseband two-tone signal and DAC codes
-            # convention : pe_dbm = power per ton, delta_f = width between the 2 tons
-        # génération du signal avec pe_dbm corrigé
+
+        # 1) Generate baseband two-tone signal and DAC codes
+        # Convention: pe_dbm = power per tone, delta_f = spacing between the two tones
+        # Generate signal using corrected TX power
         self.err_mgr.info(
             f"Generating two-tone baseband signal: f_rf={tx_corr.f_rf:.3e} Hz, "
             f"pe_dbm={tx_corr.pe_dbm:.1f} dBm, delta_f={tx_corr.delta_f:.1e} Hz, "
@@ -95,58 +105,65 @@ class IIP3Bench :
             n_sample=tx_corr.n_sample,
         )
 
-        
-        # 2) Send to Pluto TX
+        # 2) Send waveform to Pluto TX
         if self.tx_iface.is_connected():
-            self.tx_iface.configure_tx(tx_corr) #ecurity : reconfigure if needed
+            # Reconfigure TX as a safety step, then load and start cyclic waveform
+            self.tx_iface.configure_tx(tx_corr)  # security: reconfigure if needed
             self.tx_iface.load_waveform(signal_codes)
             self.err_mgr.info(
                 f"TX started: f_rf={tx_params.f_rf:.3e} Hz, P={tx_params.pe_dbm:.1f} dBm"
             )
 
-        # 3) compute theoretical FFT for display
+        # 3) Compute theoretical FFT from generated signal for visualization
         freq_abs, P_bin, P_dBm, A_sample = self.signal_utils.compute_fft(
             signal_v,
             tx_corr.fs,
-            tx_corr.f_rf  # cohérent avec SignalUtils actuel
+            tx_corr.f_rf  # consistent with current SignalUtils design
         )
 
         return freq_abs, P_bin, P_dBm, A_sample
 
-    def receive_rx(self,rx_params=None):
-         #get rx_params or use current
+    def receive_rx(self, rx_params=None):
+        # Capture RX samples using current or provided RX parameters
+        # Use previously stored RX parameters if none are given
         if rx_params is None:
             rx_params = self.current_rx_params
+
+        # Check that RX interface is available
         if not self.rx_iface.is_connected():
             self.err_mgr.error("Pluto RX not connected")
             return None
-        
+
         if rx_params is None:
+            # RX not configured before capture
             self.err_mgr.error("RX params not configured before receive_rx()")
             return None
-        
-        # Configure RX
+
+        # Configure RX hardware with requested parameters
         self.rx_iface.configure_rx(rx_params)
-        
-        # Clear buffers for avoiding leftovers
+
+        # Clear RX buffers to avoid leftover samples from previous captures
         self.rx_iface.flush_buffers(n=10)
-        
+
+        # Placeholders for potential spectrum accumulation (not used yet)
         acc_spec = None
         acc_freq = None
-        
-        # Capture
+
+        # Capture raw RX samples from Pluto
         rx_samples = self.rx_iface.receive(n_samples=rx_params.n_sample)
         self.err_mgr.info(
             f"RX captured: f_rf={rx_params.f_rf:.3e} Hz, fs={rx_params.fs:.3e} Hz"
         )
         return rx_samples
-    
-@dataclass        
+
+
+@dataclass
 class IIP3Result:
-    freq_tx     : list[float] # fréquences TX (Hz).
-    spec_tx     : list[float] # spectre TX (dBm).
-    freq_rx     : list[float] # fréquences RX (Hz).
-    spec_rx     : list[float] # spectre RX (dBm).
-    iip3_dbm    : float # IIP3 calculé (dBm).
-    delta_db    : float # ΔIM3 mesuré (dB).
-    p1_avg_dbm  : float # Puissance moyenne porteuse (dBm).
+    # Container for a complete IIP3 measurement result set
+    freq_tx: list[float]   # TX frequency axis (Hz)
+    spec_tx: list[float]   # TX spectrum (dBm)
+    freq_rx: list[float]   # RX frequency axis (Hz)
+    spec_rx: list[float]   # RX spectrum (dBm)
+    iip3_dbm: float        # Computed IIP3 value (dBm)
+    delta_db: float        # Measured IM3 delta (dB)
+    p1_avg_dbm: float      # Average carrier power (dBm)
