@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from turtle import left
+from tkinter import filedialog 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
@@ -57,7 +58,8 @@ class MainWindow(tk.Tk):
         sig_utils = SignalUtils()
         self.tx_iface = PlutoTxInterface("ip:192.168.2.1")
         self.rx_iface = PlutoRxInterface("ip:192.168.2.1")
-        calib = TxCalibration("plutot_characterization.csv")
+        self.calib_path = tk.StringVar(value="Data_Calibration_tx/plutot_tx_charac.csv")
+        calib = TxCalibration(self.calib_path.get())
         self.bench = IIP3Bench(self.tx_iface, self.rx_iface, sig_utils, self.err_mgr, calib)
 
         # --- window configuration ---
@@ -76,6 +78,20 @@ class MainWindow(tk.Tk):
         left = ttk.Frame(self, padding=10)
         left.pack(side="left", fill="y")
 
+        # === Section CSV Calibration ===
+        frame_calib = ttk.LabelFrame(left, text="TX CALIBRATION FILE")
+        frame_calib.pack(fill="x", pady=(10, 0))
+
+        ttk.Label(frame_calib, text="Calibration CSV:").pack(anchor="w")
+        self.entry_calib = ttk.Entry(frame_calib, textvariable=self.calib_path)
+        self.entry_calib.pack(fill="x")
+
+        ttk.Button(
+            frame_calib,
+            text="Browse...",
+            command=self._browse_calib_file
+        ).pack(pady=5, fill="x")
+        
         # === Section 1 : PERFORM MEASURE ===
         frame_measure = ttk.LabelFrame(left, text="PERFORM MEASURE")
         frame_measure.pack(fill="x", pady=(0, 10))
@@ -177,6 +193,20 @@ class MainWindow(tk.Tk):
         self.err_mgr.set_log_callback(self.log.write)
         self._report_pluto_status()
 
+    def _browse_calib_file(self):
+        # Let user choose a CSV file for TX calibration
+        filename = filedialog.askopenfilename(
+            title="Select calibration CSV",
+            filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
+        )
+        if not filename:
+            return
+        self.calib_path.set(filename)
+        # Reload calibration and update bench
+        calib = TxCalibration(filename)
+        self.bench.set_calibration(calib)
+        self.err_mgr.info(f"Loaded TX calibration from: {filename}")
+        
     def _report_pluto_status(self):
         # Check TX/RX connectivity and report status in the log
         tx_connected = self.bench.tx_iface.is_connected()
